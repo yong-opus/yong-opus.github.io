@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Notification Config Generator</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            toggleNotificationType();
+            $('input[name="notificationType"]').change(toggleNotificationType);
+            document.getElementById('copyToClipboardBtn').addEventListener('click', function() {
+                const jsonText = document.getElementById('result').innerText;
+                navigator.clipboard.writeText(jsonText).then(() => {
+                    alert('Copied to clipboard!');
+                }).catch(err => {
+                    console.error('Failed to copy: ', err);
+                });
+            });
+        });
+
+        function toggleNotificationType() {
+            const type = $('input[name="notificationType"]:checked').val();
+            if (type === 'popup') {
+                $('#titleField').show();
+                $('#addImageBtn').show().css('display', ''); // Reset to default display style
+                $('#addVideoBtn').show().css('display', ''); // Reset to default display style
+                // Don't automatically show image/video sections; user must click to add
+            } else { // When 'banner' is selected
+                $('#titleField').hide();
+                $('#imageSection').collapse('hide');
+                $('#addImageBtn').hide();
+                $('#videoSection').collapse('hide');
+                $('#addVideoBtn').hide();
+            }
+        }
+        
+
+        function generateConfig() {
+            event.preventDefault();
+
+            const notificationType = $('input[name="notificationType"]:checked').val();
+            let config = {
+                key: $('#key').val(),
+                text: $('#text').val(),
+                disabled: $('#disabled').is(':checked'),
+                debug: $('#debug').is(':checked'),
+                // Include title for popups only
+                ...(notificationType === 'popup' && { title: $('#title').val() }),
+                filter: {}
+            };
+
+            // Optional fields applicable to both types
+            if ($('#onlineAtUTC').val()) config.onlineAtUTC = moment($('#onlineAtUTC').val()).toISOString();
+            if ($('#offlineAtUTC').val()) config.offlineAtUTC = moment($('#offlineAtUTC').val()).toISOString();
+            if ($('#ctaUrl').val()) {
+                config.link = {
+                    url: $('#ctaUrl').val(),
+                    text: $('#ctaText').val() || 'Learn More'
+                };
+            }
+
+            let countryCodes = $('#countryCodes').val().split(',').map(item => item.trim()).filter(Boolean);
+            let urlPrefixes = $('#urlPrefixes').val().split(',').map(item => item.trim()).filter(Boolean);
+            let featureGate = $('#featureGate').val();
+
+            if (countryCodes.length) config.filter.countryCodes = countryCodes;
+            if (urlPrefixes.length) config.filter.urlPrefixes = urlPrefixes;
+            if (featureGate) config.filter.featureGate = featureGate;
+
+            // Optional fields for popups only
+            if (notificationType === 'popup') {
+                if ($('#imageUrl').val()) config.imageUrl = $('#imageUrl').val();
+                if ($('#videoUrl').val()) config.videoUrl = $('#videoUrl').val();
+            }
+
+            let finalConfig = [config]; // Directly use an array
+
+            // Convert to JSON string
+            let jsonString = `"${notificationType}": ` + JSON.stringify(finalConfig, null, 2) + `,`;
+
+            $('#result').text(jsonString);
+        }
+    </script>
+</head>
+<body>
+    <div class="container mt-5">
+        <h2>Notification Config Generator</h2>
+        <form id="configForm" onsubmit="generateConfig()">
+            <div class="form-group">
+                <div>
+                    <label><input type="radio" name="notificationType" value="popup" checked> Popup</label>
+                    <label><input type="radio" name="notificationType" value="banner"> Banner</label>
+                </div>
+                <small class="form-text text-muted">Select whether you are creating a Popup or a Banner.</small>
+            </div>
+            <div class="form-group">
+                <label for="key">Key:</label>
+                <input type="text" id="key" class="form-control" required placeholder="dd/mm/yy - topic">
+            </div>
+            <div class="form-group" id="titleField" style="display: none;">
+                <label for="title">Title:</label>
+                <input type="text" id="title" class="form-control">
+                <small class="form-text text-muted">Required for popups.</small>
+            </div>
+            <div class="form-group">
+                <label for="text">Text:</label>
+                <input type="text" id="text" class="form-control" required>
+                <small class="form-text text-muted">Max 200 characters for banners, 200 words for popups </small>
+
+            </div>
+            <div class="form-check">
+                <input type="checkbox" id="disabled" class="form-check-input" checked>
+                <label class="form-check-label" for="disabled">Disabled</label>
+                <small class="form-text text-muted">disable this notification </small>
+
+            </div>
+            <div class="form-check">
+                <input type="checkbox" id="debug" class="form-check-input" checked>
+                <label class="form-check-label" for="debug">Debug</label>
+                <small class="form-text text-muted">only visible in debug mode</small>
+
+            </div>
+            <br>
+            <h5>Optional Configs</h5>
+            <div class="form-group">
+                <label for="ctaUrl">CTA URL:</label>
+                <input type="text" id="ctaUrl" class="form-control">
+                <label for="ctaText">CTA Text:</label>
+                <input type="text" id="ctaText" class="form-control">
+            </div>
+            <div class="form-group">
+                <label for="onlineAtUTC">Online At UTC:</label>
+                <input type="datetime-local" id="onlineAtUTC" class="form-control">
+            </div>
+            <div class="form-group">
+                <label for="offlineAtUTC">Offline At UTC:</label>
+                <input type="datetime-local" id="offlineAtUTC" class="form-control">
+            </div>
+            
+            <div class="form-group">
+                <label for="countryCodes">Country Codes:</label>
+                <input type="text" id="countryCodes" class="form-control" placeholder="US, UK, CA, AU, FR, DE, ES">
+            </div>
+            <div class="form-group">
+                <label for="urlPrefixes">URL Prefixes:</label>
+                <input type="text" id="urlPrefixes" class="form-control" placeholder="https://clip.opus.pro/dashboard, http://localhost:3000/dashboard">
+            </div>
+            <div class="form-group">
+                <label for="featureGate">Feature Gate:</label>
+                <input type="text" id="featureGate" class="form-control">
+            </div>
+            <div class="collapse" id="imageSection">
+                <div class="form-group">
+                    <label for="imageUrl">Image URL (Popup Only):</label>
+                    <input type="text" id="imageUrl" class="form-control">
+                </div>
+            </div>
+            <button type="button" id="addImageBtn" class="btn btn-info" data-toggle="collapse" data-target="#imageSection" onclick="this.style.display='none';">+ Add Image URL</button>
+            <div class="collapse" id="videoSection">
+                <div class="form-group">
+                    <label for="videoUrl">Video URL (Popup Only):</label>
+                    <input type="text" id="videoUrl" class="form-control">
+                </div>
+            </div>
+            <button type="button" id="addVideoBtn" class="btn btn-info" data-toggle="collapse" data-target="#videoSection" onclick="this.style.display='none';">+ Add Video URL</button>
+                <button type="submit" class="btn btn-primary">Generate JSON</button>
+        </form>
+
+        <h3 class="mt-4">Generated JSON:</h3>
+        <pre id="result"></pre>
+        <button id="copyToClipboardBtn" class="btn btn-secondary mt-2">Copy to Clipboard</button>
+
+    </div>
+</body>
+</html>
